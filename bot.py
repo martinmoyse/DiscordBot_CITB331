@@ -36,7 +36,7 @@ db = firebase.database()
 # db.child("Branch").child("Employee").child("Male employees").push(data)
 
 bot = lightbulb.BotApp(
-    token='OTY0NDU2MDcwNzkxNzIwOTYw.Ylk5tg.dEeA3T_JXReZR7N_RsKBP0rxJQQ',
+    token='OTY0NDU2MDcwNzkxNzIwOTYw.Ylk5tg.IFw8fo7axx52q0DcfsSO-8pNiEU',
     default_enabled_guilds=(964449149963603988)
 )
 
@@ -52,7 +52,7 @@ async def callback(self, ctx):
 @tasks.task(h=24, auto_start=True)
 async def daily_reminder():
     today = date.today()
-
+  
     #logic to check for upcoming tests
     tmp = []
     tests = db.child("Tests").child(today.year).get()
@@ -74,9 +74,10 @@ async def daily_reminder():
         tmp.append('```') 
 
     #logic for hw deadline check
+    weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     helper = [0,1,2,3,4,5,6]
     deadline_homework = db.child("Homeworks").child(today.year).get()
-    days_till_homework_deadline = helper[(int(deadline_homework.val()['deadline'])) - datetime.date.today().isoweekday()]
+    days_till_homework_deadline = helper[(int(deadline_homework.val()['deadline'][0])) - datetime.date.today().isoweekday()]
 
     #logic for project deadline check
     project_deadline = db.child("Projects").child(today.year).get()
@@ -90,9 +91,14 @@ async def daily_reminder():
 
     #logic to structure the reminder message
     daily_reminder = '> **Daily reminder:** \n'
-    tests = ''.join(tmp) 
-    homework = '```Days until homework deadline:\n' + str(days_till_homework_deadline) + '```'
-    project = '```Days until project deadline:\n' + str(days_till_project_deadline) + '```'
+    tests = ''.join(tmp)
+    now = datetime.datetime.now()
+    homework = '```Homework deadline: \n' + weekdays[int(deadline_homework.val()['deadline'][0])] + ', ' + deadline_homework.val()['deadline'][1] + ' (' + str(days_till_homework_deadline) + ' days and ' + str(int(deadline_homework.val()['deadline'][1][0:2])-now.hour)  + ' hours left).' + '```'
+    if(len(str(project_deadline.val()['month']))==1):
+         project_month = '0'+str(project_deadline.val()['month']) 
+    else: 
+        project_month = str(project_deadline.val()['month'])
+    project = '```Project deadline: \n' + str(project_deadline.val()['day']) + '.' + project_month + ' (' + str(days_till_project_deadline) + ' days left).' '```'
     msg = daily_reminder + tests + '\n' + homework + '\n' + project
     await bot.rest.create_message(965355965186715700, msg)
 
@@ -166,7 +172,6 @@ async def subcommand(ctx):
     s = ''.join(tmp)    
     await ctx.respond(s)
     
-
 
 @bot.command
 @lightbulb.command('create', 'Used to create objects.')
@@ -248,6 +253,7 @@ async def add(ctx):
         await ctx.respond("You don't have permissions to use this command.")
 
 @group_create.child
+@lightbulb.option('hour', 'Formatting: hh:mm (24h)', type=str)
 @lightbulb.option('day', 'Formatting: [0, 6] where Monday = 0, Tuesday = 1 etc ', type=str)
 @lightbulb.command('homework_deadline', 'Sets deadline for current year\'s homeworks (assuming it is a recurring event).')
 @lightbulb.implements(lightbulb.SlashSubCommand)
@@ -263,11 +269,12 @@ async def add(ctx):
         # this gets the current year in order to organize the data in Tests/CurrentYear path, however it only makes sense if 
         # the course takes place in a spring semester as it would guarantee that the test is always during current year
         day = int(ctx.options.day)
-        if (day >= 0 and day <= 6):
+        hour = ctx.options.hour
+        if (day >= 0 and day <= 6 and len(hour) == 5 and int(hour[0:2]) >= 0 and int(hour[0:2]) <= 24 and int(hour[3:5]) >= 0 and int(hour[3:5]) <= 59):
             weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            data = {"deadline": ctx.options.day}
+            data = {"deadline": [ctx.options.day, ctx.options.hour]}
             db.child("Homeworks").child(year).set(data)
-            await ctx.respond("Homework deadline successfully set as " + weekdays[day])
+            await ctx.respond("Homework deadline successfully set as " + weekdays[day] + ', ' + hour)
         else:
             await ctx.respond("Incorrect value. Please use correct formatting.")
     else:
