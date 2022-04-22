@@ -5,4 +5,5 @@ After installing the requirements, it is adviced to run the bot in a virtual env
 Please, see the below commands:
 
 python -m venv env
+
 .\env\Scripts\activate
